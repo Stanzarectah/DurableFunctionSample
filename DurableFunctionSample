@@ -1,0 +1,60 @@
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Threading;
+using System.Net;
+using System.Text;
+
+
+public static class DurableFunctionSample
+{
+    [FunctionName("DurableFunction_HttpTrigger")]
+    public static async Task<HttpResponseMessage> DurableFunction_HttpTrigger(
+         [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestMessage req,
+         [DurableClient] IDurableOrchestrationClient starter,
+         ILogger log)
+    {
+        //Callback url to post back to Power Automate webhook
+        dynamic data = await req.Content.ReadAsAsync<object>();
+        string instanceId = await starter.StartNewAsync("DurableFunction_Orchestrator", data);
+
+        log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
+        return starter.CreateCheckStatusResponse(req, instanceId);
+    }
+
+    [FunctionName("DurableFunction_Orchestrator")]
+    public static async Task DurableFunction_Orchestrator(
+        [OrchestrationTrigger] IDurableOrchestrationContext context, ILogger log)
+    {
+        //Get callback url from Power Automate webhook
+        var data = context.GetInput<dynamic>();
+        var response = await context.CallActivityAsync<dynamic>("DurableFunction_Activity", data);
+    }
+
+    [FunctionName("DurableFunction_Activity")]
+    public static async Task<dynamic> DurableFunction_Activity([ActivityTrigger] IDurableActivityContext inputs,
+    ILogger log)
+    {
+        HttpResponseMessage returnResponse = new HttpResponseMessage(HttpStatusCode.OK);
+        dynamic reqBody = inputs.GetInput<dynamic>();
+
+        //Do some long running stuff here
+        Thread.Sleep(1800000);
+
+        //Post to callback url for Power Automate after long running process completes          
+        dynamic respBody = (dynamic)new JObject();
+        respBody.status = "Completed";
+        HttpClient httpClient = new HttpClient();
+        await httpClient.PostAsync((string)reqBody.callbackUrl, new StringContent(JsonConvert.SerializeObject(respBody), Encoding.UTF8, "application/json"));
+
+        return respBody;
+    }
+}
+
