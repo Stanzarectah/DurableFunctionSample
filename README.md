@@ -5,7 +5,7 @@ Currently all HTTP triggered actions in Power Automate and HTTP triggered Azure 
 
 ## Solution
 The best option is to use a **Webhook** action in Power Automate that subcribes to a **Durable function** which provides a callback url.
-During this time the Webhook waits until it receives a pot back from the durable function.
+During this time the Webhook waits until it receives a post back from the durable function.
 The logic that contains the long running process is implemented within the **Activity** function of the Durable function and then the callback url is "called back" once the long running logic has completed.
 
 Refer to articles about Durable functions [here](https://medium.com/asos-techblog/getting-started-with-durable-functions-1382adf1d6ac). They are ideally used to implement long running processes as they provide the polling and queue archtiecture required by long running processes out of the box. 
