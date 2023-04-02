@@ -21,7 +21,7 @@ public static class DurableFunctionSample
          [DurableClient] IDurableOrchestrationClient starter,
          ILogger log)
     {
-        //Callback url to post back to Power Automate webhook
+        //Get callback url from Power Automate
         dynamic data = await req.Content.ReadAsAsync<object>();
         string instanceId = await starter.StartNewAsync("DurableFunction_Orchestrator", data);
 
@@ -33,16 +33,18 @@ public static class DurableFunctionSample
     public static async Task DurableFunction_Orchestrator(
         [OrchestrationTrigger] IDurableOrchestrationContext context, ILogger log)
     {
-        //Get callback url from Power Automate webhook
+        //Get callback url from Http trigger
         var data = context.GetInput<dynamic>();
+
+        //Call the activity function
         var response = await context.CallActivityAsync<dynamic>("DurableFunction_Activity", data);
     }
 
     [FunctionName("DurableFunction_Activity")]
     public static async Task<dynamic> DurableFunction_Activity([ActivityTrigger] IDurableActivityContext inputs,
     ILogger log)
-    {
-        HttpResponseMessage returnResponse = new HttpResponseMessage(HttpStatusCode.OK);
+    {       
+        //Get callback url from orchestrator
         dynamic reqBody = inputs.GetInput<dynamic>();
 
         //Do some long running stuff here
@@ -52,7 +54,8 @@ public static class DurableFunctionSample
         dynamic respBody = (dynamic)new JObject();
         respBody.status = "Completed";
         HttpClient httpClient = new HttpClient();
-        await httpClient.PostAsync((string)reqBody.callbackUrl, new StringContent(JsonConvert.SerializeObject(respBody), Encoding.UTF8, "application/json"));
+        await httpClient.PostAsync((string)reqBody.callbackUrl, new StringContent(JsonConvert.SerializeObject(respBody),
+        Encoding.UTF8, "application/json"));
 
         return respBody;
     }
